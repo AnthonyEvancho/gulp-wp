@@ -1,7 +1,16 @@
-// Initialize modules
-// Importing specific gulp API functions lets us write them below as series() instead of gulp.series()
+// Variables
+const themeDirectory = "wp-content/themes/";
+const themeName = "evancho_base";
+const themeRoot = themeDirectory + themeName;
+const files = {
+	vendorCssPath: 'app/vendor/scss/**/*.scss',
+	scssPath: 'app/scss/**/*.scss',
+	vendorJsPath: 'app/vendor/js/**/*.js',
+	jsPath: 'app/js/**/*.js'
+};
+
+// Initialize Modules
 const { src, dest, watch, series, parallel } = require('gulp');
-// Importing all the Gulp-related packages we want to use
 const sourcemaps = require('gulp-sourcemaps');
 const sass = require('gulp-sass');
 const concat = require('gulp-concat');
@@ -10,19 +19,23 @@ const uglify = require('gulp-uglify');
 const postcss = require('gulp-postcss');
 const autoprefixer = require('autoprefixer');
 const cssnano = require('cssnano');
-var replace = require('gulp-replace');
+// const replace = require('gulp-replace');
 
+// Vendor Sass
+function vendorCssTask(){
+	return src(files.vendorCssPath)
+		.pipe(sourcemaps.init()) // initialize sourcemaps first
+		.pipe(sass()) // compile SCSS to CSS
+		.pipe(rename({
+			suffix: '.min'
+		}))
+		.pipe(postcss([ autoprefixer(), cssnano() ])) // PostCSS plugins
+		.pipe(sourcemaps.write('.')) // write sourcemaps file in current directory
+		.pipe(dest(themeRoot + '/dist')
+		); // put final CSS in dist folder
+}
 
-// File paths
-const themeDirectory = "wp-content/themes/";
-const themeName = "evancho_base";
-const themeRoot = themeDirectory + themeName;
-const files = {
-	scssPath: 'app/scss/**/*.scss',
-	jsPath: 'app/js/**/*.js'
-};
-
-// Sass task: compiles the style.scss file into style.css
+// Style Sass
 function scssTask(){
 	return src(files.scssPath)
 		.pipe(sourcemaps.init()) // initialize sourcemaps first
@@ -36,11 +49,21 @@ function scssTask(){
 		); // put final CSS in dist folder
 }
 
-// JS task: concatenates and uglifies JS files to script.js
+// Vendor JS
+function vendorJsTask(){
+	return src([
+		files.vendorJsPath
+	])
+		.pipe(concat('vendor.min.js'))
+		.pipe(uglify())
+		.pipe(dest(themeRoot + '/dist')
+		);
+}
+
+// Main JS
 function jsTask(){
 	return src([
 		files.jsPath
-		//,'!' + 'includes/js/jquery.min.js', // to exclude any specific files
 	])
 		.pipe(concat('main.min.js'))
 		.pipe(uglify())
@@ -48,7 +71,7 @@ function jsTask(){
 		);
 }
 
-// Cachebust
+// Cachebust (TO DO)
 // var cbString = new Date().getTime();
 // function cacheBustTask(){
 // 	return src(['index.html'])
@@ -56,18 +79,15 @@ function jsTask(){
 // 		.pipe(dest('.'));
 // }
 
-// Watch task: watch SCSS and JS files for changes
-// If any change, run scss and js tasks simultaneously
+// Watch Task
 function watchTask(){
-	watch([files.scssPath, files.jsPath],
-		parallel(scssTask, jsTask));
+	watch([files.vendorCssPath, files.scssPath, files.vendorJsPath, files.jsPath],
+		parallel(vendorCssTask, scssTask, vendorJsTask, jsTask));
 }
 
-// Export the default Gulp task so it can be run
-// Runs the scss and js tasks simultaneously
-// then runs cacheBust, then watch task
+// Default Gulp Task
 exports.default = series(
-	parallel(scssTask, jsTask),
+	parallel(vendorCssTask, scssTask, vendorJsTask, jsTask),
 	// cacheBustTask,
 	watchTask
 );
